@@ -1,0 +1,357 @@
+--Q:1 Sequence generator for 3 tables
+drop sequence purchases_seq;
+create sequence purchases_seq
+start with 1
+increment by 1
+maxvalue 10000;
+
+drop sequence supplies_seq;
+create sequence supplies_seq
+start with 10001
+increment by 1
+maxvalue 20000;
+
+drop sequence logs_seq;
+create sequence logs_seq
+start with 20001
+increment by 1
+maxvalue 30000;
+----------------------------------------------------------
+CREATE OR REPLACE PACKAGE retail_business_admin AS
+-- Declare externally callable subprograms
+----------------------------------------------------------
+   PROCEDURE display_customers;
+----------------------------------------------------------
+   FUNCTION purchase_saving (pur# NUMBER) RETURN NUMBER;
+----------------------------------------------------------
+   PROCEDURE monthly_sale_activities(employee_id varchar2);
+----------------------------------------------------------
+   PROCEDURE add_customers(
+	cust_cid in customers.cid%type
+	, cust_name in customers.name%type
+	, cust_telephone# in customers.telephone#%type
+	);
+----------------------------------------------------------
+	TRIGGER customers_after_insert_update
+----------------------------------------------------------
+	TRIGGER purchases_after_insert
+----------------------------------------------------------
+	TRIGGER products_after_update
+----------------------------------------------------------
+	TRIGGER supplies_after_update
+----------------------------------------------------------
+END retail_business_admin;
+----------------------------------------------------------
+/
+--================================================================================================
+CREATE OR REPLACE PACKAGE BODY retail_business_admin AS
+----------------------------------------------------------
+----------------------------------------------------------
+--Q:2 Create or replace procedure display_employees
+IS
+Cursor row_select is
+    select
+    EID
+    ,NAME
+    ,TELEPHONE#
+    ,EMAIL
+    from EMPLOYEES;
+begin
+    dbms_output.put_line('EID NAME TELEPHONE# EMAIL'); 
+    dbms_output.put_line('--- ---- ---------- ----------- ---------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.EID ||' '|| item.NAME ||' '|| item.TELEPHONE# ||' '|| item.EMAIL); 
+end loop;
+End;
+/
+Create or replace procedure display_customers
+IS
+Cursor row_select is
+    select
+    CID
+    ,NAME
+    ,TELEPHONE#
+    ,VISITS_MADE
+    ,LAST_VISIT_DATE
+    from CUSTOMERS;
+begin
+    dbms_output.put_line('CID NAME TELEPHONE# VISITS_MADE LAST_VISIT_DATE'); 
+    dbms_output.put_line('--- ---- ---------- ----------- ---------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.CID ||' '|| item.NAME ||' '|| item.TELEPHONE# ||' '|| item.VISITS_MADE ||' '||item.LAST_VISIT_DATE); 
+end loop;
+End;
+/
+Create or replace procedure display_products
+IS
+Cursor row_select is
+    select
+    PID
+    ,NAME
+    ,QOH
+    ,QOH_THRESHOLD
+    ,ORIGINAL_PRICE
+    ,DISCNT_CATEGORY
+    from PRODUCTS;
+begin
+    dbms_output.put_line('PID NAME QOH QOH_THRESHOLD ORIGINAL_PRICE DISCNT_CATEGORY'); 
+    dbms_output.put_line('--- ---- ---------- ----------- ---------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.PID ||' '|| item.NAME ||' '|| item.QOH ||' '|| item.QOH_THRESHOLD ||' '||item.ORIGINAL_PRICE ||' '||item.DISCNT_CATEGORY); 
+end loop;
+End;
+/
+
+Create or replace procedure display_discounts
+IS
+Cursor row_select is
+    select
+    DISCNT_CATEGORY
+    ,DISCNT_RATE
+     from DISCOUNTS;
+    
+begin
+    dbms_output.put_line('DISCNT_CATEGORY DISCNT_RATE'); 
+    dbms_output.put_line('--- ---- ---------- ----------- ---------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.DISCNT_CATEGORY ||' '|| item.DISCNT_RATE); 
+end loop;
+End;
+/
+
+
+Create or replace procedure display_suppliers
+IS
+Cursor row_select is
+    select
+    SID
+    ,NAME
+    ,CITY
+    ,TELEPHONE#
+    ,EMAIL
+    from SUPPLIERS;
+begin
+    dbms_output.put_line('SID NAME CITY TELEPHONE# EMAIL'); 
+    dbms_output.put_line('--- ---- ---------- ----------- ---------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.SID ||' '|| item.NAME ||' '|| item.CITY ||' '|| item.TELEPHONE# ||' '|| item.EMAIL); 
+end loop;
+End;
+/
+Create or replace procedure display_supplies
+IS
+Cursor row_select is
+    select
+    SUP#
+    ,PID
+    ,SID
+    ,SDATE
+    ,QUANTITY
+    from SUPPLIES;
+begin
+    dbms_output.put_line('SUP# PID SID SDATE QUANTITY'); 
+    dbms_output.put_line('--- ---- ---------- ----------- ---------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.SUP# ||' '|| item.PID ||' '|| item.SID ||' '|| item.SDATE ||' '|| item.QUANTITY); 
+end loop;
+End;
+/
+Create or replace procedure display_purchases
+IS
+Cursor row_select is
+    select
+    PUR#
+    ,EID
+    ,PID
+    ,CID
+    ,PTIME
+    ,QTY
+    ,TOTAL_PRICE
+    from PURCHASES;
+begin
+    dbms_output.put_line('PUR# EID PID CID PTIME QTY TOTAL_PRICE'); 
+    dbms_output.put_line('--- ---- ---------- ----------- ---------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.PUR# ||' '|| item.EID ||' '|| item.PID ||' '|| item.CID ||' '||item.PTIME ||' '||item.QTY ||' '||item.TOTAL_PRICE); 
+end loop;
+End;
+/
+Create or replace procedure display_logs
+IS
+Cursor row_select is
+    select
+    LOG#
+    ,USER_NAME
+    ,OPERATION
+    ,OP_TIME
+    ,TABLE_NAME
+    ,TUPLE_PKEY
+    from LOGS;
+begin
+    dbms_output.put_line('LOG# USER_NAME OPERATION OP_TIME TABLE_NAME TUPLE_PKEY'); 
+    dbms_output.put_line('--- ---- ---------- ----------- ---------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.LOG# ||' '|| item.USER_NAME ||' '|| item.OPERATION ||' '|| item.OP_TIME ||' '||item.TABLE_NAME ||' '||item.TUPLE_PKEY); 
+end loop;
+End;
+/
+/
+----------------------------------------------------------
+--Q:3 FUNCTION to calculate total purchase saving for a particulr Purchase_Id
+create or replace FUNCTION purchase_saving(pur_id purchases.pur#%type) RETURN NUMBER
+IS
+saving_amt NUMBER;
+BEGIN
+    SELECT ((pu.qty*pr.original_price)*di.discnt_rate) into saving_amt
+    FROM purchases pu, products pr, discounts di
+    WHERE pu.pid=pr.pid
+    and pr.discnt_category=di.discnt_category
+    and PU.PUR# = pur_id;
+
+    RETURN saving_amt;
+END purchase_saving;
+/
+----------------------------------------------------------
+--Q:4 Procedure to display monthwise sales activities for an employee
+create or replace procedure monthly_sale_activities(employee_id varchar2)
+IS
+Cursor row_select is
+    select
+    em.eid
+    , em.name
+    , substr(to_char(ptime,'Month'),1,3) as Mnth
+    , to_char(ptime,'YYYY') as Yr
+    , to_char(ptime,'MM')
+    , count(*) as Quantity
+    , sum(total_price) as Amount
+    from employees em, purchases pu
+    where em.eid=pu.eid
+    and em.eid=employee_id
+    group by em.eid, em.name, substr(to_char(ptime,'Month'),1,3), to_char(ptime,'YYYY'),to_char(ptime,'MM')
+    order by to_char(ptime,'MM');
+begin
+    dbms_output.put_line('EID | NAME | MONTH | YEAR | NO_OF_SALES | QUANTITY_SOLD | TOTAL $ AMOUNT'); 
+    dbms_output.put_line('---   ----   -----   ----   -----------   -------------   --------------'); 
+for item in row_select loop
+    dbms_output.put_line(item.EID ||' | '|| item.NAME ||' | '|| item.Mnth ||' | '|| item.Yr ||' | '||item.Quantity ||' | '||item.Amount); 
+    EXIT WHEN row_select%NOTFOUND;
+end loop;
+End;
+/
+----------------------------------------------------------
+--Q:5 Procedure to add a customer
+create or replace procedure add_customers
+(
+cust_cid in customers.cid%type
+, cust_name in customers.name%type
+, cust_telephone# in customers.telephone#%type
+)
+is
+cust_visits_made customers.visits_made%TYPE;
+
+begin
+SELECT nvl(max(visits_made),0) + 1
+into cust_visits_made
+from customers
+where cid = cust_cid;  
+
+insert into customers values(cust_cid, cust_name, cust_telephone#, cust_visits_made, sysdate);
+DBMS_OUTPUT.PUT_LINE('Customer added successfully ' || TO_CHAR(cust_cid));
+
+end;
+/
+----------------------------------------------------------
+--Q:6 Trigger to insert record into LOGS table after adding or updting customers table 
+CREATE OR REPLACE TRIGGER customers_after_insert_update
+AFTER INSERT or UPDATE
+ON CUSTOMERS
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+DECLARE
+user_name logs.user_name%type;
+BEGIN
+SELECT user INTO user_name FROM dual;
+If INSERTING THEN
+insert into logs values(logs_seq.NEXTVAL, user_name, 'INSERT', sysdate, 'CUSTOMERS', :NEW.cid);
+END IF;
+
+If UPDATING THEN
+insert into logs values(logs_seq.NEXTVAL, user_name, 'UPDATE', sysdate, 'CUSTOMERS', :NEW.cid);
+END IF;
+END;/
+----------------------------------------------------------
+--Q:6 Trigger to insert record into LOGS table after adding purchases table
+CREATE OR REPLACE TRIGGER purchases_after_insert
+AFTER INSERT
+ON PURCHASES
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+DECLARE
+user_name logs.user_name%type;
+BEGIN
+SELECT user INTO user_name FROM dual;
+insert into logs values(logs_seq.NEXTVAL, user_name, 'UPDATE', sysdate, 'PURCHASES', :NEW.pur#);
+END;
+/
+----------------------------------------------------------
+--Q:6 Trigger to insert record into LOGS table after updating products table
+CREATE OR REPLACE TRIGGER products_after_update
+AFTER UPDATE
+ON PRODUCTS
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+DECLARE
+user_name logs.user_name%type;
+BEGIN
+SELECT user INTO user_name FROM dual;
+insert into logs values(logs_seq.NEXTVAL, user_name, 'UPDATE', sysdate, 'PRODUCTS', :NEW.pid);
+END;
+/
+----------------------------------------------------------
+--Q:6 Trigger to insert record into LOGS table after updating supplies table 
+CREATE OR REPLACE TRIGGER supplies_after_update
+AFTER INSERT
+ON SUPPLIES
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+DECLARE
+user_name logs.user_name%type;
+BEGIN
+SELECT user INTO user_name FROM dual;
+insert into logs values(logs_seq.NEXTVAL, user_name, 'INSERT', sysdate, 'SUPPLIES', :NEW.sup#);
+END;
+/
+----------------------------------------------------------
+END retail_business_admin;
+
+--Q:8 Procedure to return purchase
+create or replace procedure delete_purchase
+(
+purc_pur# in purchases.pur#%type
+)
+is
+purc_pid products.pid%type;
+purc_cid customers.cid%type;
+purc_qty purchases.qty%type;
+
+begin
+SELECT pid, cid, qty
+into purc_pid, purc_cid, purc_qty
+from purchases
+where pur# = purc_pur#;  
+
+update PRODUCTS
+set qoh = qoh + purc_qty
+where pid = purc_pid;
+
+update CUSTOMERS
+set visits_made = visits_made + 1,
+last_visit_date = sysdate
+where cid = purc_cid;
+
+delete PURCHASES where pur# = purc_pur#;
+
+DBMS_OUTPUT.PUT_LINE('Purchase returned successfully ' || TO_CHAR(purc_pur#));
+
+end;
+/
